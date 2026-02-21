@@ -1,51 +1,73 @@
 import streamlit as st
 import pandas as pd
-import time
+from datetime import datetime
 
-# --- APP CONFIG ---
-st.set_page_config(page_title="Resell Hero 2026", layout="wide")
+# --- CONFIG ---
+st.set_page_config(page_title="Resell Pro 2026", layout="wide", initial_sidebar_state="expanded")
 
-# --- SIDEBAR: PROFIT CALCULATOR ---
-st.sidebar.header("💰 Quick Profit Calc")
-buy_price = st.sidebar.number_input("Buy Price ($)", value=10.0)
-sell_price = st.sidebar.number_input("Target Sell Price ($)", value=50.0)
-platform_fee = st.sidebar.slider("Platform Fee %", 0, 20, 13) # eBay avg is ~13%
+# --- STYLE ---
+st.markdown("""
+    <style>
+    .main { background-color: #f5f7f9; }
+    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    </style>
+    """, unsafe_allow_value=True)
 
-profit = sell_price - buy_price - (sell_price * (platform_fee/100))
-st.sidebar.metric("Estimated Profit", f"${profit:.2f}")
+# --- IN-MEMORY DATABASE (Simulated) ---
+if 'inventory' not in st.session_state:
+    st.session_state.inventory = []
 
-# --- MAIN INTERFACE ---
-st.title("🚀 Resell Market Analyzer")
-st.subheader("Partner View: Comp Search & Market Health")
-
-query = st.text_input("Enter Item Name (e.g. Vintage Nike Windbreaker)", "")
-
-if query:
-    with st.spinner(f"Searching marketplaces for '{query}'..."):
-        time.sleep(1.5) # Simulating API call speed
-        
-        # Mock Data (This is where the eBay API will plug in next)
-        data = {
-            "Item Title": [f"{query} - Excellent", f"{query} Blue", f"{query} Used"],
-            "Price Sold": [45.00, 38.50, 29.00],
-            "Date Sold": ["2026-02-15", "2026-02-12", "2026-02-10"],
-            "Seller": ["PowerSeller99", "ThriftKing", "GarageSaleGuy"]
+# --- SIDEBAR: NEW PURCHASE LOG ---
+with st.sidebar:
+    st.header("📸 Quick Log Item")
+    # This uses the phone's camera if opened on mobile!
+    picture = st.camera_input("Take a photo of the tag")
+    
+    item_name = st.text_input("Item Name")
+    cost = st.number_input("What did you pay?", min_value=0.0, step=1.0)
+    est_sell = st.number_input("Est. Sell Price", min_value=0.0, step=1.0)
+    
+    if st.button("✅ Save to Inventory"):
+        new_item = {
+            "Date": datetime.now().strftime("%Y-%m-%d"),
+            "Item": item_name,
+            "Cost": cost,
+            "Est. Sell": est_sell,
+            "Potential Profit": est_sell - cost - (est_sell * 0.13) # Minus 13% eBay fee
         }
-        df = pd.DataFrame(data)
-        
-        # --- MARKET HEALTH METRICS ---
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Avg Sold Price", f"${df['Price Sold'].mean():.2f}")
-        col2.metric("Market Demand", "High 🔥")
-        col3.metric("Sell-Through Rate", "65%")
+        st.session_state.inventory.append(new_item)
+        st.success("Item Saved!")
 
-        st.write("### Recent Sold Listings")
-        st.dataframe(df, use_container_width=True)
-        
-        st.success("Analysis Complete. This looks like a 'Buy'!")
-else:
-    st.info("👋 Hey partner! Enter an item above to see if it's worth picking up.")
+# --- MAIN DASHBOARD ---
+st.title("🚀 Resell Partner Dashboard")
 
-# --- FOOTER ---
+# Top Level Stats
+if st.session_state.inventory:
+    df_inv = pd.DataFrame(st.session_state.inventory)
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Items Sourced Today", len(df_inv))
+    col2.metric("Total Capital Spent", f"${df_inv['Cost'].sum():.2f}")
+    col3.metric("Projected Profit", f"${df_inv['Potential Profit'].sum():.2f}", delta_color="normal")
+
+# Comp Search Section
 st.divider()
-st.caption("2026 Resell App v1.0 | Connected to Cloud Engine")
+st.subheader("🔍 Market Research")
+search_query = st.text_input("Search Market Comps (eBay Simulation)", placeholder="e.g. Vintage 90s Disney Shirt")
+
+if search_query:
+    # Mock Market Data logic (will be replaced by eBay API tomorrow)
+    st.info(f"Showing simulated results for '{search_query}'")
+    mock_comps = pd.DataFrame({
+        "Date Sold": ["Today", "Yesterday", "2 days ago"],
+        "Price": [45.0, 32.0, 38.5],
+        "Condition": ["Used", "New", "Used"]
+    })
+    st.table(mock_comps)
+
+# Inventory List
+st.divider()
+st.subheader("📋 Sourcing Log (Current Session)")
+if st.session_state.inventory:
+    st.dataframe(pd.DataFrame(st.session_state.inventory), use_container_width=True)
+else:
+    st.write("No items logged yet. Use the sidebar to add your first find!")
